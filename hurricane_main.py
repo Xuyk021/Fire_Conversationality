@@ -5,7 +5,7 @@ from pathlib import Path
 import streamlit as st
 from openai import OpenAI
 
-from conversation_config import CLOSING, INTRODUCTION, ROUNDS
+from conversation_config import CONVERSATIONS
 
 
 # =========================================================
@@ -14,9 +14,25 @@ from conversation_config import CLOSING, INTRODUCTION, ROUNDS
 
 APP_DIR = Path(__file__).parent
 
+# EMPATHY_CONDITION = "empathic"
+
+EMPATHY_CONDITION = "neutral"
+
+# SYSTEM_PROMPT = (
+#     APP_DIR / "system_prompt_h_con.txt"
+# ).read_text(encoding="utf-8").strip()
+
+# This is for low conversationality control condition. It is not used in the main chatbot app.
 SYSTEM_PROMPT = (
-    APP_DIR / "system_prompt.txt"
+    APP_DIR / "system_prompt_l_con.txt"
 ).read_text(encoding="utf-8").strip()
+
+
+conversation = CONVERSATIONS[EMPATHY_CONDITION]
+
+INTRODUCTION = conversation["introduction"]
+ROUNDS = conversation["rounds"]
+CLOSING = conversation["closing"]
 
 MODEL = "gpt-4o-mini"
 
@@ -34,7 +50,7 @@ NEXT_QUESTION_DELAY_SECONDS = 0.5
 MIN_THINKING_TIME_SECONDS = 1.2
 
 # Delay after the entire conversation has finished
-END_DELAY_SECONDS = 2.0
+END_DELAY_SECONDS = 4.0
 
 END_MESSAGE = (
     "This is the end of the interaction. "
@@ -404,9 +420,13 @@ def advance_conversation() -> None:
 
         st.session_state.end_shown = True
 
-        # Clean rerun removes the old chat input and displays
-        # the final notice beneath the full conversation.
-        st.rerun()
+        # Show the final notice directly without rerunning the page.
+        st.info(
+            END_MESSAGE
+        )
+
+        # Stop this run so the participant remains at the bottom.
+        st.stop()
 
 
 # =========================================================
