@@ -5,11 +5,11 @@ CONVERSATIONS = {
         "introduction": "Hi, I’m Maya, a virtual preparedness assistant for the Florida Division of Emergency Management. I’m here to help you think through a few important steps to prepare for a hurricane. We’ll focus on practical things you can do ahead of time.",
 
         "rounds": [
-            # {
-            #     "id": "alerts_and_risk",
-            #     "label": "1. Alerts and Risk",
-            #     "prompt": "In Florida, follow official updates from the National Hurricane Center, National Weather Service, Florida emergency management, and your local officials. A hurricane watch means hurricane conditions are possible; a warning means they are expected. It is also important to know your evacuation zone. Do you already know your evacuation zone and how you would receive local emergency alerts?",
-            # },
+            {
+                "id": "alerts_and_risk",
+                "label": "1. Alerts and Risk",
+                "prompt": "In Florida, follow official updates from the National Hurricane Center, National Weather Service, Florida emergency management, and your local officials. Have you signed up for AlertFlorida?",
+            },
             {
                 "id": "evacuation",
                 "label": "2. Evacuation",

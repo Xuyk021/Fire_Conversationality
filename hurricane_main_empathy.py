@@ -14,43 +14,85 @@ from conversation_config import CONVERSATIONS
 
 APP_DIR = Path(__file__).parent
 
-# EMPATHY_CONDITION = "empathic"
 
-EMPATHY_CONDITION = "neutral"
+# ---------------------------------------------------------
+# Experimental condition
+#
+# Use ONLY:
+#     "empathic"
+#     "neutral"
+#
+# Change this value when deploying the two study conditions.
+# ---------------------------------------------------------
 
-# SYSTEM_PROMPT = (
-#     APP_DIR / "system_prompt_h_con.txt"
-# ).read_text(encoding="utf-8").strip()
+# EMPATHY_CONDITION = "neutral"
 
-# This is for low conversationality control condition. It is not used in the main chatbot app.
+EMPATHY_CONDITION = "empathic"
+
+
+# ---------------------------------------------------------
+# System prompt
+# ---------------------------------------------------------
+
 SYSTEM_PROMPT = (
-    APP_DIR / "system_prompt_l_con.txt"
+    APP_DIR / "system_prompt_empathy.txt"
 ).read_text(encoding="utf-8").strip()
 
 
-conversation = CONVERSATIONS[EMPATHY_CONDITION]
+# ---------------------------------------------------------
+# Load fixed conversation stimuli
+# ---------------------------------------------------------
+
+conversation = CONVERSATIONS["neutral"]
 
 INTRODUCTION = conversation["introduction"]
 ROUNDS = conversation["rounds"]
 CLOSING = conversation["closing"]
 
+
+# ---------------------------------------------------------
+# Model
+# ---------------------------------------------------------
+
 MODEL = "gpt-4o-mini"
 
+
+# ---------------------------------------------------------
+# AlertFlorida URL
+# ---------------------------------------------------------
+
+ALERT_FLORIDA_URL = (
+    "https://apps.floridadisaster.org/alertflorida/"
+)
+
+
+# ---------------------------------------------------------
 # Typing effect
+# ---------------------------------------------------------
+
 FIXED_TYPING_DELAY_SECONDS = 0.015
 GENERATED_TYPING_DELAY_SECONDS = 0.018
 
+
+# ---------------------------------------------------------
 # Timing between stages
+# ---------------------------------------------------------
+
 INTRO_TO_FIRST_QUESTION_DELAY_SECONDS = 1.0
 NEXT_QUESTION_DELAY_SECONDS = 0.5
+
 
 # Minimum amount of time the Thinking cue should remain visible.
 # If the API itself takes longer than this, the cue simply remains
 # visible until the API response arrives.
+
 MIN_THINKING_TIME_SECONDS = 1.2
 
+
 # Delay after the entire conversation has finished
+
 END_DELAY_SECONDS = 4.0
+
 
 END_MESSAGE = (
     "This is the end of the interaction. "
@@ -75,6 +117,7 @@ st.title("Hurricane Preparedness Chat")
 # =========================================================
 
 # Circular Thinking cue
+
 st.markdown(
     """
     <style>
@@ -253,7 +296,7 @@ def transcript_for_model() -> str:
     The introduction is omitted because the model mainly needs:
         fixed question
         participant answer
-        prior contingent responses
+        prior dynamic responses
 
     This allows the model to remember previous participant information
     while keeping the experimental prompts controlled.
@@ -285,8 +328,16 @@ def transcript_for_model() -> str:
 
 def generate_contingent_response() -> str:
     """
-    Generate exactly one brief conversational response
-    to the participant's most recent answer.
+    Generate exactly one brief response to the participant's
+    most recent answer.
+
+    The response follows one of two experimental conditions:
+        - empathic
+        - neutral
+
+    Round 1 (AlertFlorida) is handled separately so that participants
+    who indicate that they have not signed up can receive the
+    AlertFlorida registration link.
 
     GPT does NOT generate the study's next question.
     The next question always comes from conversation_config.py.
@@ -300,31 +351,155 @@ def generate_contingent_response() -> str:
         st.session_state.round_index
     ]
 
+    current_round_id = current_round["id"]
+
+    current_round_label = current_round["label"]
+
+    current_round_prompt = current_round["prompt"]
+
+
+    # -----------------------------------------------------
+    # Condition-specific response instructions
+    # -----------------------------------------------------
+
+    if EMPATHY_CONDITION == "empathic":
+
+        condition_instruction = """
+The current experimental condition is EMPATHIC.
+
+Your response should communicate empathy toward what the participant
+has shared.
+
+Naturally use language such as:
+- "I understand..."
+- "I can see..."
+- "I can imagine..."
+
+when appropriate.
+
+The empathetic language must be connected to the participant's actual
+response. Do not invent feelings, concerns, circumstances, or personal
+information that the participant did not express or imply.
+
+Keep the response concise and natural.
+""".strip()
+
+    else:
+
+        condition_instruction = """
+The current experimental condition is NEUTRAL.
+
+Respond in a neutral, factual, and concise manner.
+
+Do NOT use empathetic or emotionally validating language such as:
+- "I understand..."
+- "I can see..."
+- "I can imagine..."
+- "That sounds stressful..."
+- "That must be difficult..."
+- "I'm glad..."
+
+Do not infer or comment on the participant's emotions.
+
+Briefly acknowledge the information the participant provided without
+adding empathy.
+""".strip()
+
+
+    # -----------------------------------------------------
+    # Special handling for Round 1: AlertFlorida
+    # -----------------------------------------------------
+
+    if current_round_id == "alerts_and_risk":
+
+        round_specific_instruction = f"""
+SPECIAL RULE FOR THIS ROUND:
+
+This question asks whether the participant has signed up for
+AlertFlorida.
+
+Carefully interpret the participant's latest response.
+
+If the participant clearly indicates that they HAVE ALREADY signed up
+for AlertFlorida:
+- Briefly acknowledge that they are already signed up.
+- Do NOT provide the AlertFlorida registration link.
+
+If the participant indicates that they HAVE NOT signed up, have NOT
+done it yet, are unsure whether they are signed up, or otherwise
+indicate that they still need to register:
+- Briefly respond according to the assigned experimental condition.
+- Tell them that they can sign up for AlertFlorida using this link:
+{ALERT_FLORIDA_URL}
+- Include the URL exactly as written above.
+
+Do not ask a follow-up question.
+
+Do not introduce evacuation, supplies, home preparation, household
+needs, or any later study topic.
+""".strip()
+
+    else:
+
+        round_specific_instruction = """
+There are no additional round-specific instructions.
+
+Respond only to the participant's latest answer according to the
+assigned experimental condition.
+
+Do not introduce additional hurricane-preparedness recommendations
+beyond the content already provided in the fixed study stimulus.
+""".strip()
+
+
+    # -----------------------------------------------------
+    # User prompt sent to GPT
+    # -----------------------------------------------------
+
     prompt = f"""
+Current experimental condition:
+{EMPATHY_CONDITION}
+
 Current fixed study round:
-{current_round["label"]}
+{current_round_label}
+
+Current fixed study question:
+{current_round_prompt}
 
 Conversation so far:
 {transcript_for_model()}
 
-Write Maya's single brief contingent response to the
-participant's latest answer.
+Condition-specific instructions:
+{condition_instruction}
+
+Round-specific instructions:
+{round_specific_instruction}
+
+
+Write Maya's single brief response to the participant's latest answer.
 
 Important:
 - Respond specifically to what the participant just said.
-- You may naturally acknowledge relevant information they
-  shared earlier in the conversation.
+- Follow the assigned EMPATHIC or NEUTRAL condition exactly.
+- You may naturally use relevant information the participant shared
+  earlier in the conversation.
+- Do not invent information about the participant.
 - Do not ask any question.
 - Do not introduce the next topic.
+- Do not preview the next fixed question.
 - Do not provide the next study question.
+- Do not mention experimental conditions or study design.
+- Output only Maya's response.
+- Do not include "Maya:" or "Chatbot:".
 - The application will display the next fixed question separately.
 """.strip()
+
 
     response = client.responses.create(
         model=MODEL,
         instructions=SYSTEM_PROMPT,
         input=prompt,
-        max_output_tokens=120,
+        max_output_tokens=160,
     )
 
     return response.output_text.strip()
@@ -341,7 +516,7 @@ def show_fixed_message(
     """
     Show a new controlled study stimulus.
 
-    1. Remove the meaningless visual 'Chatbot:' prefix.
+    1. Remove the visual 'Chatbot:' prefix.
     2. Stream the fixed message.
     3. Save the cleaned text to message history.
     """
@@ -373,6 +548,7 @@ def advance_conversation() -> None:
 
     st.session_state.round_index += 1
 
+
     # -----------------------------------------------------
     # More fixed questions remain
     # -----------------------------------------------------
@@ -394,6 +570,7 @@ def advance_conversation() -> None:
 
         # Rerun so chat_input appears cleanly under the new question.
         st.rerun()
+
 
     # -----------------------------------------------------
     # No more questions: show closing
@@ -444,7 +621,9 @@ if not st.session_state.started:
 
     # Mark as started before animation to protect against
     # accidental duplicate initialization.
+
     st.session_state.started = True
+
 
     # -----------------------------------------------------
     # Introduction
@@ -455,6 +634,7 @@ if not st.session_state.started:
         "introduction",
     )
 
+
     # -----------------------------------------------------
     # Pause before Question 1
     # -----------------------------------------------------
@@ -462,6 +642,7 @@ if not st.session_state.started:
     time.sleep(
         INTRO_TO_FIRST_QUESTION_DELAY_SECONDS
     )
+
 
     # -----------------------------------------------------
     # Question 1
@@ -476,6 +657,7 @@ if not st.session_state.started:
 
     # Rerun to render the completed history normally
     # and activate chat_input.
+
     st.rerun()
 
 
@@ -514,14 +696,17 @@ if (
 
         # Immediately lock the current round.
         # This guarantees exactly one response per fixed question.
+
         st.session_state.waiting_for_answer = False
         st.session_state.api_error = None
+
 
         add_message(
             "user",
             user_answer,
             "participant_answer",
         )
+
 
         # -------------------------------------------------
         # Show participant response immediately
@@ -530,8 +715,9 @@ if (
         with st.chat_message("user"):
             st.markdown(user_answer)
 
+
         # -------------------------------------------------
-        # Generate conversational response
+        # Generate response
         # -------------------------------------------------
 
         with st.chat_message("assistant"):
@@ -539,6 +725,7 @@ if (
             response_placeholder = st.empty()
 
             # Show the circular Thinking cue BEFORE GPT responds.
+
             show_thinking_cue(
                 response_placeholder
             )
@@ -553,8 +740,9 @@ if (
 
             except Exception as exc:
 
-                # Remove the participant answer because the round
+                # Remove participant answer because the round
                 # was not successfully completed.
+
                 st.session_state.messages.pop()
 
                 st.session_state.waiting_for_answer = True
@@ -565,6 +753,7 @@ if (
                 )
 
                 st.rerun()
+
 
             # -------------------------------------------------
             # Keep the Thinking cue visible for a minimum time
@@ -585,8 +774,11 @@ if (
                     - thinking_elapsed
                 )
 
+
             # Remove Thinking cue
+
             response_placeholder.empty()
+
 
             # -------------------------------------------------
             # Stream GPT response
@@ -599,12 +791,15 @@ if (
                 )
             )
 
+
         # Save GPT response
+
         add_message(
             "assistant",
             dynamic_reply,
             "generated_response",
         )
+
 
         # -------------------------------------------------
         # Continue to next fixed stimulus
